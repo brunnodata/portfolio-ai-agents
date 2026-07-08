@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   DashboardData,
+  DashboardFilters,
   fetchDashboard,
   login,
   subscribeEvents,
 } from "@/lib/api";
 import {
+  CortesAnaliticosCard,
+  FiltrosDashboard,
   KPICards,
   LancamentosTable,
   OfensoresChart,
@@ -18,6 +21,7 @@ import {
 export default function Home() {
   const [token, setToken] = useState<string | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
+  const [filters, setFilters] = useState<DashboardFilters>({});
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -28,14 +32,14 @@ export default function Home() {
     if (saved) setToken(saved);
   }, []);
 
-  const loadData = useCallback(async (t: string) => {
-    const d = await fetchDashboard(t);
+  const loadData = useCallback(async (t: string, f: DashboardFilters = {}) => {
+    const d = await fetchDashboard(t, f);
     setData(d);
   }, []);
 
   useEffect(() => {
     if (!token) return;
-    loadData(token).catch(() => {
+    loadData(token, filters).catch(() => {
       localStorage.removeItem("gastozap_token");
       setToken(null);
     });
@@ -43,9 +47,9 @@ export default function Home() {
       setData(d);
       setLive(true);
       setTimeout(() => setLive(false), 3000);
-    });
+    }, filters);
     return unsub;
-  }, [token, loadData]);
+  }, [token, filters, loadData]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -54,8 +58,8 @@ export default function Home() {
       const t = await login(username, password);
       localStorage.setItem("gastozap_token", t);
       setToken(t);
-    } catch {
-      setError("Usuário ou senha incorretos");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao entrar");
     }
   }
 
@@ -106,6 +110,11 @@ export default function Home() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         <KPICards kpis={data.kpis} />
+        <FiltrosDashboard
+          filters={filters}
+          onChange={setFilters}
+        />
+        <CortesAnaliticosCard cortes={data.cortes} />
         <div className="grid grid-2">
           <SetorChart porSetor={data.por_setor} />
           <OfensoresChart ofensores={data.ofensores} />

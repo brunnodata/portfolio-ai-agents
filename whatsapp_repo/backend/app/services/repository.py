@@ -2,7 +2,7 @@ import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import and_, extract, func, select
+from sqlalchemy import and_, extract, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -44,19 +44,52 @@ class LancamentoRepository:
             await db.flush()
         return setor
 
+    async def resolve_estabelecimento(
+        self, db: AsyncSession, nome: str, setor_id: int | None = None
+    ) -> tuple[Estabelecimento, bool]:
+        """Busca por nome_exibicao, nome_fatura ou obs. Cria se não existir (RF-22)."""
+        nome_norm = nome.strip()
+        nome_lower = nome_norm.lower()
+
+        estab = await db.scalar(
+            select(Estabelecimento).where(
+                or_(
+                    func.lower(Estabelecimento.nome_exibicao) == nome_lower,
+                    func.lower(func.coalesce(Estabelecimento.nome_fatura, "")) == nome_lower,
+                    func.lower(func.coalesce(Estabelecimento.obs, "")) == nome_lower,
+                    func.lower(Estabelecimento.nome_exibicao).contains(nome_lower),
+                    func.lower(func.coalesce(Estabelecimento.nome_fatura, "")).contains(nome_lower),
+                )
+            )
+        )
+        if estab:
+            return estab, False
+
+        estab = Estabelecimento(nome_exibicao=nome_norm, setor_id=setor_id)
+        db.add(estab)
+        await db.flush()
+        return estab, True
+
     async def get_or_create_estabelecimento(
         self, db: AsyncSession, nome: str, setor_id: int | None = None
     ) -> Estabelecimento:
-        nome_norm = nome.strip()
-        estab = await db.scalar(
-            select(Estabelecimento).where(
-                func.lower(Estabelecimento.nome_exibicao) == nome_norm.lower()
-            )
-        )
-        if not estab:
-            estab = Estabelecimento(nome_exibicao=nome_norm, setor_id=setor_id)
-            db.add(estab)
-            await db.flush()
+        estab, _ = await self.resolve_estabelecimento(db, nome, setor_id)
+        return estab
+
+    async def salvar_nome_personalizado(
+        self, db: AsyncSession, estabelecimento_id: int, nome: str
+    ) -> Estabelecimento | None:
+        estab = await db.get(Estabelecimento, estabelecimento_id)
+        if estab:
+            estab.obs = nome.strip()
+        return estab
+
+    async def vincular_nome_fatura(
+        self, db: AsyncSession, estabelecimento_id: int, nome_fatura: str
+    ) -> Estabelecimento | None:
+        estab = await db.get(Estabelecimento, estabelecimento_id)
+        if estab:
+            estab.nome_fatura = nome_fatura.strip()
         return estab
 
     async def get_default_cartao(self, db: AsyncSession) -> Cartao | None:
@@ -87,9 +120,11 @@ class LancamentoRepository:
         origem: str,
         message_id: str | None,
         key_id: str | None,
-    ) -> Lancamento:
+    ) -> tuple[Lancamento, Estabelecimento, bool]:
         setor = await self.get_or_create_setor(db, extracao.setor or "outros")
-        estab = await self.get_or_create_estabelecimento(db, extracao.estabelecimento or "Desconhecido", setor.id)
+        estab, is_novo = await self.resolve_estabelecimento(
+            db, extracao.estabelecimento or "Desconhecido", setor.id
+        )
         data_hora = extracao.data_hora or datetime.now(timezone.utc)
 
         lancamento = Lancamento(
@@ -106,7 +141,7 @@ class LancamentoRepository:
         )
         db.add(lancamento)
         await db.flush()
-        return lancamento
+        return lancamento, estab, is_novo
 
     async def get_ultimo_lancamento(self, db: AsyncSession) -> Lancamento | None:
         return await db.scalar(
@@ -115,6 +150,48 @@ class LancamentoRepository:
             .order_by(Lancamento.id.desc())
             .limit(1)
         )
+
+    async def get_lancamento(self, db: AsyncSession, lancamento_id: int) -> Lancamento | None:
+        return await db.scalar(
+            select(Lancamento)
+            .options(selectinload(Lancamento.estabelecimento), selectinload(Lancamento.setor))
+            .where(Lancamento.id == lancamento_id)
+        )
+
+    async def update_lancamento(
+        self,
+        db: AsyncSession,
+        lancamento_id: int,
+        extracao: ExtracaoLancamento,
+    ) -> Lancamento | None:
+        lanc = await self.get_lancamento(db, lancamento_id)
+        if not lanc:
+            return None
+
+        if extracao.estabelecimento:
+            setor_id = lanc.setor_id
+            if extracao.setor:
+                setor = await self.get_or_create_setor(db, extracao.setor)
+                setor_id = setor.id
+                lanc.setor_id = setor_id
+            estab, _ = await self.resolve_estabelecimento(db, extracao.estabelecimento, setor_id)
+            lanc.estabelecimento_id = estab.id
+
+        if extracao.setor and not extracao.estabelecimento:
+            setor = await self.get_or_create_setor(db, extracao.setor)
+            lanc.setor_id = setor.id
+
+        if extracao.tipo:
+            lanc.tipo = extracao.tipo
+        if extracao.valor is not None:
+            lanc.valor = extracao.valor
+        if extracao.parcelas is not None:
+            lanc.parcelas = extracao.parcelas
+        if extracao.data_hora:
+            lanc.data_hora = extracao.data_hora
+
+        await db.flush()
+        return lanc
 
     async def delete_lancamento(self, db: AsyncSession, lancamento_id: int) -> bool:
         lanc = await db.get(Lancamento, lancamento_id)
@@ -155,6 +232,41 @@ class LancamentoRepository:
             .order_by(Lancamento.data_hora.desc())
             .limit(limit)
         )
+        return list(result.all())
+
+    async def list_filtrados(
+        self,
+        db: AsyncSession,
+        *,
+        setor: str | None = None,
+        tipo: str | None = None,
+        mes: int | None = None,
+        ano: int | None = None,
+        cartao_id: int | None = None,
+        limit: int = 50,
+    ) -> list[Lancamento]:
+        query = (
+            select(Lancamento)
+            .options(selectinload(Lancamento.estabelecimento), selectinload(Lancamento.setor))
+            .order_by(Lancamento.data_hora.desc())
+            .limit(limit)
+        )
+        conditions = []
+        if setor:
+            query = query.join(Setor)
+            conditions.append(Setor.nome == setor.lower())
+        if tipo:
+            conditions.append(Lancamento.tipo == tipo)
+        if mes:
+            conditions.append(extract("month", Lancamento.data_hora) == mes)
+        if ano:
+            conditions.append(extract("year", Lancamento.data_hora) == ano)
+        if cartao_id:
+            conditions.append(Lancamento.cartao_id == cartao_id)
+        if conditions:
+            query = query.where(and_(*conditions))
+
+        result = await db.scalars(query)
         return list(result.all())
 
     async def gastos_por_setor_mes(self, db: AsyncSession, mes: int, ano: int) -> list[tuple[str, Decimal]]:

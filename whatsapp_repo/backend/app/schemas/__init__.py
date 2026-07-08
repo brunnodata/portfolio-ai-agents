@@ -19,6 +19,9 @@ class ExtracaoLancamento(BaseModel):
     campos_faltantes: list[str] = Field(default_factory=list)
     resposta_texto: str | None = None
     mudou_contexto: bool = False
+    acao_correcao: Literal["apagar", "editar"] | None = None
+    campos_correcao: dict[str, Any] | None = None
+    lancamento_alvo: Literal["ultimo", "especifico"] | None = None
 
 
 class CartaoCreate(BaseModel):
@@ -76,6 +79,21 @@ class ProjecaoItem(BaseModel):
     mes: str
     valor: Decimal
     tipo: str
+    descricao: str | None = None
+
+
+class TipoGasto(BaseModel):
+    tipo: str
+    total: Decimal
+    percentual: float
+
+
+class CortesAnaliticos(BaseModel):
+    por_tipo: list[TipoGasto]
+    continua_proximo_mes: Decimal
+    nao_volta_proximo_mes: Decimal
+    recorrentes_estimados: Decimal
+    projecao_proximo_mes: Decimal
 
 
 class DashboardData(BaseModel):
@@ -84,6 +102,7 @@ class DashboardData(BaseModel):
     lancamentos_recentes: list[LancamentoListItem]
     projecoes: list[ProjecaoItem]
     ofensores: list[SetorGasto]
+    cortes: CortesAnaliticos
 
 
 class WebhookMessage(BaseModel):

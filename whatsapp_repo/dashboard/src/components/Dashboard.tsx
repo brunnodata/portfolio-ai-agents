@@ -143,10 +143,102 @@ export function ProjecoesCard({ projecoes }: { projecoes: DashboardData["projeco
       <ul style={{ listStyle: "none" }}>
         {projecoes.map((p, i) => (
           <li key={i} style={{ padding: "0.4rem 0", borderBottom: "1px solid #334155" }}>
-            <strong>{p.mes}</strong> — {formatBRL(p.valor)} <span className="badge">{p.tipo}</span>
+            <strong>{p.mes}</strong> — {formatBRL(p.valor)}{" "}
+            <span className="badge">{p.tipo.replace(/_/g, " ")}</span>
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+export function CortesAnaliticosCard({ cortes }: { cortes: DashboardData["cortes"] }) {
+  return (
+    <div className="card">
+      <h3 style={{ marginBottom: "1rem" }}>Cortes analíticos</h3>
+      <div className="grid grid-4" style={{ marginBottom: "1rem" }}>
+        <div>
+          <div className="kpi-value" style={{ fontSize: "1.2rem" }}>
+            {formatBRL(cortes.projecao_proximo_mes)}
+          </div>
+          <div className="kpi-label">Projeção próximo mês</div>
+        </div>
+        <div>
+          <div className="kpi-value" style={{ fontSize: "1.2rem" }}>
+            {formatBRL(cortes.continua_proximo_mes)}
+          </div>
+          <div className="kpi-label">Continua (assin./fixo/parc.)</div>
+        </div>
+        <div>
+          <div className="kpi-value" style={{ fontSize: "1.2rem" }}>
+            {formatBRL(cortes.nao_volta_proximo_mes)}
+          </div>
+          <div className="kpi-label">À vista (não volta)</div>
+        </div>
+        <div>
+          <div className="kpi-value" style={{ fontSize: "1.2rem" }}>
+            {formatBRL(cortes.recorrentes_estimados)}
+          </div>
+          <div className="kpi-label">Recorrentes (mercado/gas./lanche)</div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Total mês</th>
+            <th>%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cortes.por_tipo.map((t) => (
+            <tr key={t.tipo}>
+              <td>{t.tipo.replace(/_/g, " ")}</td>
+              <td>{formatBRL(t.total)}</td>
+              <td>{t.percentual.toFixed(1)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function FiltrosDashboard({
+  filters,
+  onChange,
+}: {
+  filters: { setor?: string; tipo?: string };
+  onChange: (filters: { setor?: string; tipo?: string }) => void;
+}) {
+  return (
+    <div className="card" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "end" }}>
+      <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minWidth: "140px" }}>
+        <span className="kpi-label">Setor</span>
+        <select
+          className="filter-select"
+          value={filters.setor || ""}
+          onChange={(e) => onChange({ ...filters, setor: e.target.value || undefined })}
+        >
+          <option value="">Todos</option>
+          {["mercado", "lanche", "gasolina", "ferramenta", "cursos", "viagem", "restaurante", "outros"].map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", flex: 1, minWidth: "140px" }}>
+        <span className="kpi-label">Tipo</span>
+        <select
+          className="filter-select"
+          value={filters.tipo || ""}
+          onChange={(e) => onChange({ ...filters, tipo: e.target.value || undefined })}
+        >
+          <option value="">Todos</option>
+          {["a_vista", "assinatura", "fixo", "parcelado"].map((t) => (
+            <option key={t} value={t}>{t.replace("_", " ")}</option>
+          ))}
+        </select>
+      </label>
     </div>
   );
 }

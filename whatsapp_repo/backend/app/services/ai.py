@@ -17,6 +17,11 @@ EXTRACTION_SYSTEM_PROMPT = """Você é um assistente financeiro que extrai dados
 
 Identifique a intenção: novo_gasto, correcao, consulta, resumo_mes, cadastro_cartao, confirmacao, outro.
 
+Para intenção **correcao**, extraia também:
+- acao_correcao: "apagar" ou "editar"
+- campos_correcao: objeto com campos a alterar (estabelecimento, setor, tipo, valor, parcelas)
+- lancamento_alvo: "ultimo" (padrão) ou "especifico"
+
 Para gastos, extraia:
 - estabelecimento (nome da loja/local)
 - setor (mercado, ferramenta, lanche, cursos, viagem, gasolina, restaurante, outros)
@@ -195,6 +200,9 @@ Responda JSON ou null se não for cadastro de cartão."""
             campos_faltantes=raw.get("campos_faltantes", []),
             resposta_texto=raw.get("resposta_texto"),
             mudou_contexto=raw.get("mudou_contexto", False),
+            acao_correcao=raw.get("acao_correcao"),
+            campos_correcao=raw.get("campos_correcao"),
+            lancamento_alvo=raw.get("lancamento_alvo", "ultimo"),
         )
 
     def _fallback_extraction(self, text: str) -> ExtracaoLancamento:
@@ -202,8 +210,13 @@ Responda JSON ou null se não for cadastro de cartão."""
 
         lower = text.lower()
         intencao = "novo_gasto"
-        if any(w in lower for w in ["apaga", "remove", "corrige", "corrigir"]):
+        acao_correcao = None
+        if any(w in lower for w in ["apaga", "remove", "exclui"]):
             intencao = "correcao"
+            acao_correcao = "apagar"
+        elif any(w in lower for w in ["corrige", "corrigir", "altera", "muda"]):
+            intencao = "correcao"
+            acao_correcao = "editar"
         elif "quanto" in lower and "gastei" in lower:
             intencao = "consulta"
         elif "resumo" in lower:
@@ -226,6 +239,9 @@ Responda JSON ou null se não for cadastro de cartão."""
             valor=valor,
             confianca=0.3 if campos_faltantes else 0.6,
             campos_faltantes=campos_faltantes,
+            acao_correcao=acao_correcao,
+            campos_correcao={"valor": str(valor)} if valor and acao_correcao == "editar" else None,
+            lancamento_alvo="ultimo",
         )
 
 

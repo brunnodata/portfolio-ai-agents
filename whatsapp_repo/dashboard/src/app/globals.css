@@ -120,3 +120,12 @@ th {
   background: #166534;
   color: #bbf7d0;
 }
+
+.filter-select {
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
+  width: 100%;
+}

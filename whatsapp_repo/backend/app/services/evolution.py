@@ -67,6 +67,12 @@ class EvolutionAPIClient:
         return digits
 
     @staticmethod
+    def is_outgoing_message(data: dict[str, Any]) -> bool:
+        """Ignora mensagens enviadas pelo próprio bot (evita loop no webhook)."""
+        key = data.get("key", {})
+        return bool(key.get("fromMe") or data.get("fromMe"))
+
+    @staticmethod
     def extract_phone_from_payload(data: dict[str, Any]) -> str | None:
         key = data.get("key", {})
         remote_jid = key.get("remoteJid", "")

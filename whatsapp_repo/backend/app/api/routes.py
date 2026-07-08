@@ -44,7 +44,10 @@ async def verify_token(authorization: str = Header(default="")) -> dict:
 
 def verify_webhook_secret(request: Request) -> None:
     secret = request.headers.get("x-webhook-secret") or request.headers.get("apikey", "")
-    if settings.webhook_secret and secret != settings.webhook_secret:
+    if not settings.webhook_secret and not settings.evolution_api_key:
+        return
+    allowed = {settings.webhook_secret, settings.evolution_api_key} - {""}
+    if secret not in allowed:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Webhook não autorizado")
 
 
@@ -83,6 +86,9 @@ async def evolution_webhook(request: Request, db: AsyncSession = Depends(get_db)
     if isinstance(data, list):
         data = data[0] if data else {}
 
+    if evolution_client.is_outgoing_message(data):
+        return {"status": "ignored", "reason": "fromMe"}
+
     phone = evolution_client.extract_phone_from_payload(data)
     if not phone:
         return {"status": "no_phone"}
@@ -91,6 +97,7 @@ async def evolution_webhook(request: Request, db: AsyncSession = Depends(get_db)
     msg_info = evolution_client.extract_message_info(data)
 
     if msg_info["tipo"] in ("audio", "imagem", "documento"):
+        await evolution_client.send_text(phone, "⏳")
 
         async def media_handler(p: str, mtype: str, payload: dict) -> None:
             async with async_session_factory() as session:
@@ -99,7 +106,7 @@ async def evolution_webhook(request: Request, db: AsyncSession = Depends(get_db)
                     text = await ai_service.transcribe_audio(payload["media_bytes"])
                 elif mtype in ("imagem", "documento") and payload.get("media_bytes"):
                     text = await ai_service.extract_from_image(payload["media_bytes"], payload.get("caption", ""))
-                info = payload["msg_info"]
+                info = {**payload["msg_info"], "skip_hourglass": True}
                 await agent_service.process_message(session, p, info, text, notify_dashboard)
                 await session.commit()
 
@@ -128,8 +135,15 @@ async def evolution_webhook(request: Request, db: AsyncSession = Depends(get_db)
 
 
 @router.get("/api/dashboard", response_model=DashboardData)
-async def get_dashboard(db: AsyncSession = Depends(get_db), _user=Depends(verify_token)):
-    return await dashboard_service.get_dashboard_data(db)
+async def get_dashboard(
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(verify_token),
+    setor: str | None = None,
+    tipo: str | None = None,
+    mes: int | None = None,
+    ano: int | None = None,
+):
+    return await dashboard_service.get_dashboard_data(db, setor=setor, tipo=tipo, mes=mes, ano=ano)
 
 
 @router.get("/api/lancamentos")
@@ -137,8 +151,15 @@ async def list_lancamentos(
     db: AsyncSession = Depends(get_db),
     _user=Depends(verify_token),
     limit: int = 50,
+    setor: str | None = None,
+    tipo: str | None = None,
+    mes: int | None = None,
+    ano: int | None = None,
+    cartao_id: int | None = None,
 ):
-    lancamentos = await lancamento_repo.list_recentes(db, limit)
+    lancamentos = await lancamento_repo.list_filtrados(
+        db, setor=setor, tipo=tipo, mes=mes, ano=ano, cartao_id=cartao_id, limit=limit
+    )
     return [
         {
             "id": l.id,
