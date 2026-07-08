@@ -11,10 +11,39 @@ import {
   Tooltip,
 } from "chart.js";
 import { Bar, Doughnut } from "react-chartjs-2";
-import type { DashboardData } from "@/lib/api";
+import type { AdminLLMCost, DashboardData } from "@/lib/api";
 import { formatBRL } from "@/lib/api";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
+
+const SETOR_LABEL: Record<string, string> = {
+  mercado: "Mercado",
+  ferramenta: "Ferramenta",
+  lanche: "Lanche",
+  cursos: "Cursos",
+  viagem: "Viagem",
+  gasolina: "Gasolina",
+  restaurante: "Restaurante",
+  assinatura: "Assinatura",
+  outros: "Outros",
+  roupa: "Roupa",
+};
+
+const TIPO_LABEL: Record<string, string> = {
+  a_vista: "À Vista",
+  assinatura: "Assinatura",
+  fixo: "Fixo",
+  parcelado: "Parcelado",
+  cartao_futuro: "Cartão Futuro",
+};
+
+function prettySetor(value: string): string {
+  return SETOR_LABEL[value] ?? value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function prettyTipo(value: string): string {
+  return TIPO_LABEL[value] ?? value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export function KPICards({ kpis }: { kpis: DashboardData["kpis"] }) {
   const variacao =
@@ -34,7 +63,7 @@ export function KPICards({ kpis }: { kpis: DashboardData["kpis"] }) {
       </div>
       <div className="card">
         <div className="kpi-value">{formatBRL(kpis.media_diaria)}</div>
-        <div className="kpi-label">Média diária</div>
+        <div className="kpi-label">Média por dia com gasto</div>
       </div>
       <div className="card">
         <div className="kpi-value">{formatBRL(kpis.projecao_mes)}</div>
@@ -47,7 +76,7 @@ export function KPICards({ kpis }: { kpis: DashboardData["kpis"] }) {
 }
 
 export function SetorChart({ porSetor }: { porSetor: DashboardData["por_setor"] }) {
-  const labels = porSetor.map((s) => s.setor);
+  const labels = porSetor.map((s) => prettySetor(s.setor));
   const values = porSetor.map((s) => s.total);
 
   return (
@@ -85,7 +114,7 @@ export function OfensoresChart({ ofensores }: { ofensores: DashboardData["ofenso
       <h3 style={{ marginBottom: "1rem" }}>Maiores ofensores</h3>
       <Doughnut
         data={{
-          labels: ofensores.map((o) => o.setor),
+          labels: ofensores.map((o) => prettySetor(o.setor)),
           datasets: [
             {
               data: ofensores.map((o) => o.total),
@@ -110,10 +139,12 @@ export function LancamentosTable({ lancamentos }: { lancamentos: DashboardData["
         <thead>
           <tr>
             <th>Data</th>
+            <th>Item</th>
             <th>Estabelecimento</th>
             <th>Setor</th>
             <th>Tipo</th>
             <th>Valor</th>
+            <th>Hora</th>
             <th>Origem</th>
           </tr>
         </thead>
@@ -121,10 +152,12 @@ export function LancamentosTable({ lancamentos }: { lancamentos: DashboardData["
           {lancamentos.map((l) => (
             <tr key={l.id}>
               <td>{new Date(l.data_hora).toLocaleDateString("pt-BR")}</td>
+              <td>{l.item || "—"}</td>
               <td>{l.estabelecimento}</td>
-              <td><span className="badge">{l.setor}</span></td>
-              <td>{l.tipo.replace("_", " ")}</td>
+              <td><span className="badge">{prettySetor(l.setor)}</span></td>
+              <td>{prettyTipo(l.tipo)}</td>
               <td>{formatBRL(l.valor)}</td>
+              <td>{new Date(l.data_hora).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
               <td>{l.origem}</td>
             </tr>
           ))}
@@ -144,7 +177,7 @@ export function ProjecoesCard({ projecoes }: { projecoes: DashboardData["projeco
         {projecoes.map((p, i) => (
           <li key={i} style={{ padding: "0.4rem 0", borderBottom: "1px solid #334155" }}>
             <strong>{p.mes}</strong> — {formatBRL(p.valor)}{" "}
-            <span className="badge">{p.tipo.replace(/_/g, " ")}</span>
+            <span className="badge">{prettyTipo(p.tipo)}</span>
           </li>
         ))}
       </ul>
@@ -193,7 +226,7 @@ export function CortesAnaliticosCard({ cortes }: { cortes: DashboardData["cortes
         <tbody>
           {cortes.por_tipo.map((t) => (
             <tr key={t.tipo}>
-              <td>{t.tipo.replace(/_/g, " ")}</td>
+              <td>{prettyTipo(t.tipo)}</td>
               <td>{formatBRL(t.total)}</td>
               <td>{t.percentual.toFixed(1)}%</td>
             </tr>
@@ -222,7 +255,7 @@ export function FiltrosDashboard({
         >
           <option value="">Todos</option>
           {["mercado", "lanche", "gasolina", "ferramenta", "cursos", "viagem", "restaurante", "outros"].map((s) => (
-            <option key={s} value={s}>{s}</option>
+            <option key={s} value={s}>{prettySetor(s)}</option>
           ))}
         </select>
       </label>
@@ -235,10 +268,53 @@ export function FiltrosDashboard({
         >
           <option value="">Todos</option>
           {["a_vista", "assinatura", "fixo", "parcelado"].map((t) => (
-            <option key={t} value={t}>{t.replace("_", " ")}</option>
+            <option key={t} value={t}>{prettyTipo(t)}</option>
           ))}
         </select>
       </label>
+    </div>
+  );
+}
+
+export function AdminLLMCostCard({ data }: { data: AdminLLMCost }) {
+  const used = Math.min(Math.max(data.budget_used_percent, 0), 100);
+  return (
+    <div className="card">
+      <h3 style={{ marginBottom: "1rem" }}>Admin — Custos LLM</h3>
+      <div className="grid grid-4" style={{ marginBottom: "1rem" }}>
+        <div>
+          <div className="kpi-value" style={{ fontSize: "1.2rem" }}>{formatBRL(data.estimated_brl)}</div>
+          <div className="kpi-label">Custo acumulado</div>
+        </div>
+        <div>
+          <div className="kpi-value" style={{ fontSize: "1.2rem" }}>{formatBRL(data.daily_budget_brl)}</div>
+          <div className="kpi-label">Limite diário</div>
+        </div>
+        <div>
+          <div className="kpi-value" style={{ fontSize: "1.2rem" }}>{data.total_tokens.toLocaleString("pt-BR")}</div>
+          <div className="kpi-label">Tokens totais</div>
+        </div>
+        <div>
+          <div className="kpi-value" style={{ fontSize: "1.2rem" }}>{data.calls}</div>
+          <div className="kpi-label">Chamadas LLM</div>
+        </div>
+      </div>
+      <div style={{ marginBottom: "0.6rem", color: "#94a3b8", fontSize: "0.85rem" }}>
+        Uso do limite: {used.toFixed(1)}%
+      </div>
+      <div style={{ width: "100%", height: 10, background: "#334155", borderRadius: 999 }}>
+        <div
+          style={{
+            width: `${used}%`,
+            height: "100%",
+            borderRadius: 999,
+            background: used > 90 ? "#ef4444" : used > 70 ? "#f59e0b" : "#22c55e",
+          }}
+        />
+      </div>
+      <div style={{ marginTop: "1rem", color: "#94a3b8", fontSize: "0.85rem" }}>
+        Entrada/1k: R$ {data.rates.input_per_1k_brl.toFixed(4)} | Saída/1k: R$ {data.rates.output_per_1k_brl.toFixed(4)}
+      </div>
     </div>
   );
 }

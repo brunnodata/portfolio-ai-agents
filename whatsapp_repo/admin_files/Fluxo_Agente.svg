@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 1280" font-family="Segoe UI, system-ui, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#5a5a5a"/>
+    </marker>
+    <style>
+      .title { font-size: 22px; font-weight: 600; fill: #1a1a1a; }
+      .subtitle { font-size: 13px; fill: #555; }
+      .section { font-size: 15px; font-weight: 600; fill: #2c5282; }
+      .box { fill: #f7fafc; stroke: #a0aec0; stroke-width: 1.2; }
+      .io { fill: #ebf8ff; stroke: #4299e1; }
+      .decision { fill: #fffaf0; stroke: #dd6b20; }
+      .terminal { fill: #2b6cb0; stroke: #2b6cb0; }
+      .terminal text { fill: #fff; font-weight: 600; }
+      .label { font-size: 11px; fill: #1a202c; text-anchor: middle; }
+      .edge-label { font-size: 10px; fill: #718096; }
+      .legend { font-size: 11px; fill: #4a5568; }
+    </style>
+  </defs>
+
+  <text x="460" y="36" class="title" text-anchor="middle">GastoZap - Fluxo do Agente de IA</text>
+  <text x="460" y="58" class="subtitle" text-anchor="middle">Pipeline geral + novo gasto + intencoes</text>
+
+  <!-- LEGEND -->
+  <rect x="40" y="78" width="840" height="52" rx="6" class="box"/>
+  <rect x="56" y="94" width="36" height="20" rx="4" class="io"/>
+  <text x="100" y="108" class="legend">Entrada / saida</text>
+  <rect x="200" y="94" width="36" height="20" rx="4" class="box"/>
+  <text x="244" y="108" class="legend">Processo</text>
+  <polygon points="356,94 392,104 356,114 320,104" class="decision"/>
+  <text x="404" y="108" class="legend">Decisao</text>
+  <rect x="500" y="94" width="36" height="20" rx="10" class="terminal"/>
+  <text x="544" y="108" class="legend">Resultado</text>
+  <line x1="640" y1="104" x2="680" y2="104" stroke="#dd6b20" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="692" y="108" class="legend">Ciclo / retorno</text>
+
+  <!-- SECTION 1: PIPELINE -->
+  <text x="40" y="158" class="section">1. Pipeline geral</text>
+
+  <rect x="380" y="172" width="160" height="36" rx="6" class="io"/>
+  <text x="460" y="195" class="label">WhatsApp</text>
+
+  <line x1="460" y1="208" x2="460" y2="228" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <rect x="360" y="228" width="200" height="36" rx="6" class="box"/>
+  <text x="460" y="251" class="label">Evolution API + Webhook</text>
+
+  <line x1="460" y1="264" x2="460" y2="284" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <polygon points="460,284 520,304 460,324 400,304" class="decision"/>
+  <text x="460" y="307" class="label">Whitelist OK?</text>
+
+  <line x1="460" y1="324" x2="460" y2="344" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <polygon points="460,344 530,364 460,384 390,364" class="decision"/>
+  <text x="460" y="360" class="label">texto / audio / imagem</text>
+
+  <line x1="530" y1="364" x2="620" y2="364" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="568" y="356" class="edge-label">midia</text>
+  <rect x="620" y="346" width="180" height="36" rx="6" class="box"/>
+  <text x="710" y="362" class="label">Whisper / GPT-4o Vision</text>
+
+  <line x1="710" y1="382" x2="710" y2="412" stroke="#5a5a5a"/>
+  <line x1="710" y1="412" x2="460" y2="412" stroke="#5a5a5a"/>
+  <line x1="460" y1="384" x2="460" y2="412" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="400" y="406" class="edge-label">texto</text>
+
+  <rect x="340" y="412" width="240" height="36" rx="6" class="box"/>
+  <text x="460" y="435" class="label">AgentService.process_message</text>
+
+  <line x1="460" y1="448" x2="460" y2="468" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <rect x="360" y="468" width="200" height="36" rx="6" class="box"/>
+  <text x="460" y="491" class="label">AIService (OpenAI)</text>
+
+  <line x1="360" y1="486" x2="300" y2="486" stroke="#5a5a5a"/>
+  <line x1="300" y1="486" x2="300" y2="430" stroke="#5a5a5a"/>
+  <line x1="300" y1="430" x2="340" y2="430" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="278" y="460" class="edge-label" transform="rotate(-90 278 460)">JSON</text>
+
+  <line x1="460" y1="504" x2="460" y2="524" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <rect x="320" y="524" width="280" height="36" rx="6" class="io"/>
+  <text x="460" y="547" class="label">PostgreSQL + Resposta WhatsApp + SSE</text>
+
+  <!-- SECTION 2: NOVO GASTO -->
+  <text x="40" y="598" class="section">2. Novo gasto (detalhe)</text>
+
+  <rect x="60" y="612" width="150" height="34" rx="6" class="io"/>
+  <text x="135" y="634" class="label">Mensagem</text>
+  <line x1="135" y1="646" x2="135" y2="666" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <rect x="50" y="666" width="170" height="34" rx="6" class="box"/>
+  <text x="135" y="688" class="label">extract_structured</text>
+  <line x1="135" y1="700" x2="135" y2="720" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <polygon points="135,720 185,738 135,756 85,738" class="decision"/>
+  <text x="135" y="741" class="label">Completo?</text>
+
+  <line x1="85" y1="738" x2="40" y2="738" stroke="#5a5a5a"/>
+  <line x1="40" y1="738" x2="40" y2="800" stroke="#5a5a5a"/>
+  <line x1="40" y1="800" x2="135" y2="800" stroke="#dd6b20" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="24" y="772" class="edge-label" transform="rotate(-90 24 772)">nao</text>
+  <rect x="135" y="782" width="170" height="34" rx="6" class="box"/>
+  <text x="220" y="804" class="label">TransacaoPendente</text>
+
+  <line x1="185" y1="738" x2="280" y2="738" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="228" y="730" class="edge-label">sim</text>
+  <polygon points="330,720 390,738 330,756 270,738" class="decision"/>
+  <text x="330" y="741" class="label">Cartao?</text>
+
+  <line x1="270" y1="738" x2="220" y2="738" stroke="#5a5a5a"/>
+  <line x1="220" y1="738" x2="220" y2="860" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="208" y="800" class="edge-label" transform="rotate(-90 208 800)">sem</text>
+  <rect x="145" y="860" width="150" height="34" rx="6" class="box"/>
+  <text x="220" y="882" class="label">Cadastro cartao</text>
+
+  <line x1="390" y1="738" x2="450" y2="738" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="414" y="730" class="edge-label">multiplos</text>
+  <rect x="450" y="720" width="150" height="34" rx="6" class="box"/>
+  <text x="525" y="742" class="label">Escolher cartao</text>
+
+  <line x1="330" y1="756" x2="330" y2="790" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="342" y="776" class="edge-label">ok</text>
+  <polygon points="330,790 400,808 330,826 260,808" class="decision"/>
+  <text x="330" y="811" class="label">Confirmar?</text>
+
+  <line x1="330" y1="826" x2="330" y2="860" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <rect x="255" y="860" width="150" height="34" rx="6" class="box"/>
+  <text x="330" y="882" class="label">Persistir</text>
+
+  <line x1="525" y1="754" x2="525" y2="878" stroke="#5a5a5a"/>
+  <line x1="525" y1="878" x2="405" y2="878" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <line x1="295" y1="894" x2="295" y2="878" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+
+  <line x1="330" y1="894" x2="330" y2="918" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <rect x="240" y="918" width="180" height="34" rx="18" class="terminal"/>
+  <text x="330" y="940" class="label">Cadastrei: ...</text>
+
+  <!-- SECTION 3: INTENCOES -->
+  <text x="40" y="988" class="section">3. Roteamento por intencao</text>
+
+  <rect x="380" y="1002" width="160" height="34" rx="6" class="box"/>
+  <text x="460" y="1024" class="label">ExtracaoLancamento</text>
+  <line x1="460" y1="1036" x2="460" y2="1056" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <polygon points="460,1056 520,1076 460,1096 400,1076" class="decision"/>
+  <text x="460" y="1079" class="label">intencao</text>
+
+  <line x1="400" y1="1076" x2="120" y2="1076" stroke="#5a5a5a"/>
+  <line x1="120" y1="1076" x2="120" y2="1120" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="250" y="1068" class="edge-label">novo_gasto</text>
+  <rect x="40" y="1120" width="160" height="34" rx="18" class="terminal"/>
+  <text x="120" y="1142" class="label">Lancamento</text>
+
+  <line x1="440" y1="1096" x2="440" y2="1120" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="448" y="1112" class="edge-label">consulta</text>
+  <rect x="360" y="1120" width="160" height="34" rx="18" class="terminal"/>
+  <text x="440" y="1142" class="label">Soma por setor</text>
+
+  <line x1="480" y1="1096" x2="480" y2="1120" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="488" y="1112" class="edge-label">resumo_mes</text>
+  <rect x="400" y="1120" width="160" height="34" rx="18" class="terminal"/>
+  <text x="480" y="1142" class="label">Total + setores</text>
+
+  <line x1="520" y1="1076" x2="760" y2="1076" stroke="#5a5a5a"/>
+  <line x1="760" y1="1076" x2="760" y2="1120" stroke="#5a5a5a" marker-end="url(#arrow)"/>
+  <text x="620" y="1068" class="edge-label">correcao</text>
+  <rect x="680" y="1120" width="160" height="34" rx="18" class="terminal"/>
+  <text x="760" y="1142" class="label">Editar / apagar</text>
+
+  <!-- FOOTER -->
+  <text x="460" y="1260" class="subtitle" text-anchor="middle">Fonte: backend/app/services/agent.py | admin_files/Documentacao_Agente.md</text>
+</svg>

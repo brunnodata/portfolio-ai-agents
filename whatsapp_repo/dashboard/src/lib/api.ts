@@ -1,9 +1,11 @@
-// No browser usa proxy same-origin (/api-proxy) para evitar CORS no Easypanel.
-// No build/server usa NEXT_PUBLIC_API_URL apontando para o backend.
-export const API_URL =
-  typeof window !== "undefined"
-    ? "/api-proxy"
-    : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+function resolveApiUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (configured) return configured;
+  if (typeof window !== "undefined") return "/api-proxy";
+  return "http://localhost:8000";
+}
+
+export const API_URL = resolveApiUrl();
 
 export interface DashboardKPIs {
   total_mes: number;
@@ -21,6 +23,7 @@ export interface SetorGasto {
 
 export interface Lancamento {
   id: number;
+  item: string | null;
   estabelecimento: string;
   setor: string;
   tipo: string;
@@ -28,6 +31,22 @@ export interface Lancamento {
   parcelas: string | null;
   data_hora: string;
   origem: string;
+}
+
+export interface AdminLLMCost {
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  estimated_brl: number;
+  daily_budget_brl: number;
+  budget_used_percent: number;
+  budget_remaining_brl: number;
+  updated_at: string | null;
+  rates: {
+    input_per_1k_brl: number;
+    output_per_1k_brl: number;
+  };
 }
 
 export interface DashboardData {
@@ -50,6 +69,31 @@ export interface DashboardFilters {
   tipo?: string;
   mes?: number;
   ano?: number;
+}
+
+export interface Cartao {
+  id: number;
+  banco_origem: string;
+  ultimos_4_digitos: string;
+  vencimento: string | null;
+  bandeira: string | null;
+  limite_total: number | null;
+  limite_em_uso: number | null;
+  limite_restante: number | null;
+  qt_assinaturas: number;
+  valores_futuros: Record<string, number>;
+  cartao_padrao: string;
+  obs: string | null;
+}
+
+export interface CartaoInput {
+  banco_origem: string;
+  ultimos_4_digitos: string;
+  vencimento?: string;
+  bandeira?: string;
+  limite_total?: number;
+  cartao_padrao?: string;
+  obs?: string;
 }
 
 export async function login(username: string, password: string): Promise<string> {
@@ -79,8 +123,65 @@ export async function fetchDashboard(token: string, filters: DashboardFilters = 
   const res = await fetch(`${API_URL}/api/dashboard${qs ? `?${qs}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error("Falha ao carregar dashboard");
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body || `Erro ${res.status} ao carregar dashboard`);
+  }
   return res.json();
+}
+
+export async function fetchAdminLLMCost(token: string): Promise<AdminLLMCost> {
+  const res = await fetch(`${API_URL}/api/admin/llm-cost`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body || `Erro ${res.status} ao carregar custos`);
+  }
+  return res.json();
+}
+
+async function apiFetch(token: string, path: string, init: RequestInit = {}) {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(init.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    let detail = body;
+    try {
+      detail = JSON.parse(body).detail || body;
+    } catch {
+      /* use raw body */
+    }
+    throw new Error(detail || `Erro ${res.status}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+export async function fetchCartoes(token: string): Promise<Cartao[]> {
+  return apiFetch(token, "/api/cartoes");
+}
+
+export async function createCartao(token: string, data: CartaoInput): Promise<Cartao> {
+  return apiFetch(token, "/api/cartoes", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateCartao(token: string, id: number, data: Partial<CartaoInput>): Promise<Cartao> {
+  return apiFetch(token, `/api/cartoes/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function setCartaoPadrao(token: string, id: number): Promise<Cartao> {
+  return apiFetch(token, `/api/cartoes/${id}/padrao`, { method: "PATCH" });
+}
+
+export async function deleteCartao(token: string, id: number): Promise<void> {
+  await apiFetch(token, `/api/cartoes/${id}`, { method: "DELETE" });
 }
 
 export function formatBRL(value: number): string {

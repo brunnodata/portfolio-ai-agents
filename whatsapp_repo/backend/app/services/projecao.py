@@ -64,13 +64,6 @@ class ProjecaoService:
                 chave = f"{mes}|recorrente_{setor_nome}"
                 agregado[chave] = agregado.get(chave, Decimal("0")) + total_mes
 
-        cartoes = await db.scalars(select(Cartao))
-        for cartao in cartoes:
-            if cartao.valores_futuros:
-                for mes, valor in cartao.valores_futuros.items():
-                    chave = f"{mes}|cartao_futuro"
-                    agregado[chave] = agregado.get(chave, Decimal("0")) + Decimal(str(valor))
-
         for chave, valor in sorted(agregado.items()):
             mes, tipo = chave.split("|", 1)
             projecoes.append(ProjecaoItem(mes=mes, valor=valor.quantize(Decimal("0.01")), tipo=tipo))
@@ -94,10 +87,10 @@ class ProjecaoService:
             .order_by(func.sum(Lancamento.valor).desc())
         )
         por_tipo_raw = [(r[0], Decimal(str(r[1]))) for r in por_tipo_rows.all()]
-        total_mes = sum(v for _, v in por_tipo_raw) or Decimal("1")
+        total_mes = sum((v for _, v in por_tipo_raw), Decimal("0")) or Decimal("1")
 
-        continua = sum(v for t, v in por_tipo_raw if t in TIPOS_CONTINUAM)
-        nao_volta = sum(v for t, v in por_tipo_raw if t == "a_vista")
+        continua = sum((v for t, v in por_tipo_raw if t in TIPOS_CONTINUAM), Decimal("0"))
+        nao_volta = sum((v for t, v in por_tipo_raw if t == "a_vista"), Decimal("0"))
 
         recorrentes = Decimal("0")
         for setor in RECORRENTES_POR_NATUREZA:

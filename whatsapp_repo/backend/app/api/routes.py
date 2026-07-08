@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date as date_type, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from jose import JWTError, jwt
@@ -9,12 +9,21 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.config import get_settings
 from app.database import async_session_factory, get_db
-from app.schemas import DashboardData, LoginRequest, TokenResponse, WebhookMessage
+from app.schemas import (
+    CartaoCreate,
+    CartaoResponse,
+    CartaoUpdate,
+    DashboardData,
+    LoginRequest,
+    TokenResponse,
+    WebhookMessage,
+)
 from app.services.agent import agent_service
 from app.services.ai import ai_service
 from app.services.dashboard import dashboard_service
 from app.services.events import event_broadcaster
 from app.services.evolution import evolution_client
+from app.services.llm_cost import llm_cost_tracker
 from app.services.queue import QueueItem, message_queue
 from app.services.repository import lancamento_repo
 
@@ -64,6 +73,33 @@ async def notify_dashboard(event: dict) -> None:
     await event_broadcaster.publish({"type": "refresh", **event})
 
 
+def _parse_vencimento(value: str | None) -> date_type | None:
+    if not value:
+        return None
+    try:
+        return date_type.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _cartao_to_response(cartao) -> CartaoResponse:
+    valores = cartao.valores_futuros or {}
+    return CartaoResponse(
+        id=cartao.id,
+        banco_origem=cartao.banco_origem,
+        ultimos_4_digitos=cartao.ultimos_4_digitos,
+        vencimento=cartao.vencimento.isoformat() if cartao.vencimento else None,
+        bandeira=cartao.bandeira,
+        limite_total=float(cartao.limite_total) if cartao.limite_total is not None else None,
+        limite_em_uso=float(cartao.limite_em_uso) if cartao.limite_em_uso is not None else None,
+        limite_restante=float(cartao.limite_restante) if cartao.limite_restante is not None else None,
+        qt_assinaturas=cartao.qt_assinaturas or 0,
+        valores_futuros={k: float(v) for k, v in valores.items()},
+        cartao_padrao=cartao.cartao_padrao,
+        obs=cartao.obs,
+    )
+
+
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(body: LoginRequest):
     if body.username != settings.dashboard_username or body.password != settings.dashboard_password:
@@ -80,6 +116,7 @@ async def evolution_webhook(request: Request, db: AsyncSession = Depends(get_db)
 
     event = webhook.event or body.get("event", "")
     if event not in ("messages.upsert", "MESSAGES_UPSERT", "message"):
+        logger.info("Webhook ignorado: evento=%s", event)
         return {"status": "ignored", "event": event}
 
     data = webhook.data or body.get("data", body)
@@ -87,17 +124,20 @@ async def evolution_webhook(request: Request, db: AsyncSession = Depends(get_db)
         data = data[0] if data else {}
 
     if evolution_client.is_outgoing_message(data):
+        logger.info("Webhook ignorado: mensagem enviada pelo proprio numero (fromMe)")
         return {"status": "ignored", "reason": "fromMe"}
 
     phone = evolution_client.extract_phone_from_payload(data)
     if not phone:
+        logger.info("Webhook sem telefone no payload")
         return {"status": "no_phone"}
 
     verify_whitelist(phone)
     msg_info = evolution_client.extract_message_info(data)
+    logger.info("Webhook recebido: phone=%s tipo=%s", phone, msg_info["tipo"])
 
     if msg_info["tipo"] in ("audio", "imagem", "documento"):
-        await evolution_client.send_text(phone, "⏳")
+        await evolution_client.send_text(phone, "⏳ Processando mídia...")
 
         async def media_handler(p: str, mtype: str, payload: dict) -> None:
             async with async_session_factory() as session:
@@ -128,9 +168,11 @@ async def evolution_webhook(request: Request, db: AsyncSession = Depends(get_db)
 
     text = msg_info["conteudo"]
     if not text:
+        logger.info("Webhook sem texto extraido")
         return {"status": "empty"}
 
     result = await agent_service.process_message(db, phone, msg_info, text, notify_dashboard)
+    logger.info("Webhook processado para %s", phone)
     return {"status": "processed", "response": result}
 
 
@@ -143,7 +185,83 @@ async def get_dashboard(
     mes: int | None = None,
     ano: int | None = None,
 ):
-    return await dashboard_service.get_dashboard_data(db, setor=setor, tipo=tipo, mes=mes, ano=ano)
+    try:
+        return await dashboard_service.get_dashboard_data(db, setor=setor, tipo=tipo, mes=mes, ano=ano)
+    except Exception as e:
+        logger.exception("Erro ao carregar dashboard")
+        raise HTTPException(status_code=500, detail=f"Erro ao carregar dashboard: {e}") from e
+
+
+@router.get("/api/cartoes", response_model=list[CartaoResponse])
+async def list_cartoes(
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(verify_token),
+):
+    cartoes = await lancamento_repo.list_cartoes(db)
+    return [_cartao_to_response(c) for c in cartoes]
+
+
+@router.post("/api/cartoes", response_model=CartaoResponse, status_code=status.HTTP_201_CREATED)
+async def create_cartao(
+    body: CartaoCreate,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(verify_token),
+):
+    cartao = await lancamento_repo.create_cartao(
+        db,
+        {
+            "banco_origem": body.banco_origem.strip(),
+            "ultimos_4_digitos": body.ultimos_4_digitos[-4:],
+            "vencimento": _parse_vencimento(body.vencimento),
+            "bandeira": body.bandeira,
+            "limite_total": body.limite_total,
+            "cartao_padrao": body.cartao_padrao or "nao",
+            "obs": body.obs,
+        },
+    )
+    return _cartao_to_response(cartao)
+
+
+@router.patch("/api/cartoes/{cartao_id}", response_model=CartaoResponse)
+async def update_cartao(
+    cartao_id: int,
+    body: CartaoUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(verify_token),
+):
+    payload = body.model_dump(exclude_unset=True)
+    if "vencimento" in payload:
+        payload["vencimento"] = _parse_vencimento(payload.get("vencimento"))
+    if payload.get("ultimos_4_digitos"):
+        payload["ultimos_4_digitos"] = payload["ultimos_4_digitos"][-4:]
+    cartao = await lancamento_repo.update_cartao(db, cartao_id, payload)
+    if not cartao:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cartão não encontrado")
+    return _cartao_to_response(cartao)
+
+
+@router.patch("/api/cartoes/{cartao_id}/padrao", response_model=CartaoResponse)
+async def set_cartao_padrao(
+    cartao_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(verify_token),
+):
+    cartao = await lancamento_repo.set_cartao_padrao(db, cartao_id)
+    if not cartao:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cartão não encontrado")
+    return _cartao_to_response(cartao)
+
+
+@router.delete("/api/cartoes/{cartao_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_cartao(
+    cartao_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(verify_token),
+):
+    ok, msg = await lancamento_repo.delete_cartao(db, cartao_id)
+    if not ok:
+        status_code = status.HTTP_404_NOT_FOUND if msg == "Cartão não encontrado" else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=status_code, detail=msg)
 
 
 @router.get("/api/lancamentos")
@@ -163,6 +281,7 @@ async def list_lancamentos(
     return [
         {
             "id": l.id,
+            "item": l.item,
             "estabelecimento": l.estabelecimento.nome_exibicao,
             "setor": l.setor.nome,
             "tipo": l.tipo,
@@ -187,6 +306,11 @@ async def verify_token_query(token: str = "") -> dict:
 @router.get("/api/events")
 async def sse_events(token: str = "", _user=Depends(verify_token_query)):
     return EventSourceResponse(event_broadcaster.event_stream())
+
+
+@router.get("/api/admin/llm-cost")
+async def admin_llm_cost(_user=Depends(verify_token)):
+    return llm_cost_tracker.snapshot()
 
 
 @router.get("/health")

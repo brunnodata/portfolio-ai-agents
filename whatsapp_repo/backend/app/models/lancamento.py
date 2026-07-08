@@ -16,6 +16,7 @@ class Lancamento(Base):
     cartao_id: Mapped[int] = mapped_column(ForeignKey("cartoes.id"), nullable=False)
     fatura_id: Mapped[int | None] = mapped_column(ForeignKey("faturas_importadas.id"))
     tipo: Mapped[str] = mapped_column(String(20), nullable=False)
+    item: Mapped[str | None] = mapped_column(String(200))
     valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     parcelas: Mapped[str | None] = mapped_column(String(20))
     data_hora: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

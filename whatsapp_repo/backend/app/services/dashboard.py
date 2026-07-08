@@ -33,27 +33,25 @@ class DashboardService:
         total_ant = await lancamento_repo.sum_mes(db, mes_ant, ano_ant)
         por_setor_raw = await lancamento_repo.gastos_por_setor_mes(db, mes_ref, ano_ref)
 
-        if setor or tipo:
-            recentes = await lancamento_repo.list_filtrados(
-                db, setor=setor, tipo=tipo, mes=mes_ref, ano=ano_ref, limit=30
-            )
-        else:
-            recentes = await lancamento_repo.list_recentes(db, 15)
+        recentes = await lancamento_repo.list_filtrados(
+            db, setor=setor, tipo=tipo, mes=mes_ref, ano=ano_ref, limit=30
+        )
 
-        qtd = await db.scalar(
-            select(func.count(Lancamento.id)).where(
+        qtd = len(recentes)
+
+        projecao_proximo = await projecao_service.total_projecao_proximo_mes(db)
+        dias_com_gasto = await db.scalar(
+            select(func.count(func.distinct(func.date(Lancamento.data_hora)))).where(
                 and_(
                     extract("month", Lancamento.data_hora) == mes_ref,
                     extract("year", Lancamento.data_hora) == ano_ref,
                 )
             )
         )
-
-        projecao_proximo = await projecao_service.total_projecao_proximo_mes(db)
-        dias = max(now.day if mes_ref == now.month and ano_ref == now.year else 30, 1)
+        dias = max(int(dias_com_gasto or 0), 1)
         media = total_mes / Decimal(dias)
 
-        total_geral = sum(v for _, v in por_setor_raw) or Decimal("1")
+        total_geral = sum((v for _, v in por_setor_raw), Decimal("0")) or Decimal("1")
         por_setor = [
             SetorGasto(setor=s, total=t, percentual=float(t / total_geral * 100))
             for s, t in por_setor_raw
@@ -62,6 +60,7 @@ class DashboardService:
         lanc_items = [
             LancamentoListItem(
                 id=l.id,
+                item=l.item,
                 estabelecimento=l.estabelecimento.nome_exibicao,
                 setor=l.setor.nome,
                 tipo=l.tipo,

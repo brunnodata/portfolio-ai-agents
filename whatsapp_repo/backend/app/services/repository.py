@@ -1,3 +1,4 @@
+import copy
 import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -5,6 +6,7 @@ from decimal import Decimal
 from sqlalchemy import and_, extract, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.models import (
     Cartao,
@@ -24,7 +26,8 @@ SETORES_PADRAO = [
     "gasolina", "restaurante", "assinatura", "outros",
 ]
 
-ESSENTIAL_FIELDS = ["estabelecimento", "setor", "tipo", "valor"]
+# O que pedimos ao usuário quando faltar. Setor NUNCA — é sempre inferido.
+ESSENTIAL_FIELDS = ["valor"]
 
 
 class LancamentoRepository:
@@ -105,12 +108,52 @@ class LancamentoRepository:
     async def create_cartao(self, db: AsyncSession, data: dict) -> Cartao:
         cartao = Cartao(**data)
         if cartao.cartao_padrao == "sim":
-            others = await db.scalars(select(Cartao).where(Cartao.cartao_padrao == "sim"))
-            for c in others:
-                c.cartao_padrao = "nao"
+            await self._clear_cartoes_padrao(db)
         db.add(cartao)
         await db.flush()
         return cartao
+
+    async def set_cartao_padrao(self, db: AsyncSession, cartao_id: int) -> Cartao | None:
+        cartao = await db.get(Cartao, cartao_id)
+        if not cartao:
+            return None
+        await self._clear_cartoes_padrao(db)
+        cartao.cartao_padrao = "sim"
+        await db.flush()
+        return cartao
+
+    async def _clear_cartoes_padrao(self, db: AsyncSession) -> None:
+        others = await db.scalars(select(Cartao).where(Cartao.cartao_padrao == "sim"))
+        for c in others:
+            c.cartao_padrao = "nao"
+
+    async def get_cartao(self, db: AsyncSession, cartao_id: int) -> Cartao | None:
+        return await db.get(Cartao, cartao_id)
+
+    async def update_cartao(self, db: AsyncSession, cartao_id: int, data: dict) -> Cartao | None:
+        cartao = await db.get(Cartao, cartao_id)
+        if not cartao:
+            return None
+        if data.get("cartao_padrao") == "sim":
+            await self._clear_cartoes_padrao(db)
+        for key, value in data.items():
+            if hasattr(cartao, key):
+                setattr(cartao, key, value)
+        await db.flush()
+        return cartao
+
+    async def delete_cartao(self, db: AsyncSession, cartao_id: int) -> tuple[bool, str]:
+        cartao = await db.get(Cartao, cartao_id)
+        if not cartao:
+            return False, "Cartão não encontrado"
+        count = await db.scalar(
+            select(func.count()).select_from(Lancamento).where(Lancamento.cartao_id == cartao_id)
+        )
+        if count:
+            return False, "Cartão possui lançamentos vinculados e não pode ser removido"
+        await db.delete(cartao)
+        await db.flush()
+        return True, ""
 
     async def create_lancamento(
         self,
@@ -132,6 +175,7 @@ class LancamentoRepository:
             setor_id=setor.id,
             cartao_id=cartao_id,
             tipo=extracao.tipo or "a_vista",
+            item=extracao.item,
             valor=extracao.valor or Decimal("0"),
             parcelas=extracao.parcelas,
             data_hora=data_hora,
@@ -183,6 +227,8 @@ class LancamentoRepository:
 
         if extracao.tipo:
             lanc.tipo = extracao.tipo
+        if extracao.item is not None:
+            lanc.item = extracao.item or None
         if extracao.valor is not None:
             lanc.valor = extracao.valor
         if extracao.parcelas is not None:
@@ -222,6 +268,12 @@ class LancamentoRepository:
                     extract("year", Lancamento.data_hora) == ano,
                 )
             )
+        )
+        return Decimal(str(total or 0))
+
+    async def sum_lancamentos_cartao(self, db: AsyncSession, cartao_id: int) -> Decimal:
+        total = await db.scalar(
+            select(func.coalesce(func.sum(Lancamento.valor), 0)).where(Lancamento.cartao_id == cartao_id)
         )
         return Decimal(str(total or 0))
 
@@ -305,7 +357,8 @@ class ConversaRepository:
         ctx = await self.get_context(db, phone)
         ctx.estado = estado
         if dados is not None:
-            ctx.dados_estado = dados
+            ctx.dados_estado = copy.deepcopy(dados)
+            flag_modified(ctx, "dados_estado")
 
     async def get_pendente_ativa(self, db: AsyncSession, phone: str) -> TransacaoPendente | None:
         return await db.scalar(

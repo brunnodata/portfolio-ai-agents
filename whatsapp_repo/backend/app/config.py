@@ -38,6 +38,9 @@ class Settings(BaseSettings):
         default="whisper-1",
         validation_alias=AliasChoices("WHISPER_MODEL", "WHISPER_API_MODEL"),
     )
+    llm_input_cost_per_1k_brl: float = 0.03
+    llm_output_cost_per_1k_brl: float = 0.06
+    llm_daily_budget_brl: float = 50.0
 
     # Security — aceita WHITELIST_NUMBERS (Setup_Ambiente.md) ou ALLOWED_PHONE_NUMBERS
     allowed_phone_numbers: str = Field(

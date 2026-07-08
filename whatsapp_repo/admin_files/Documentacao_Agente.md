@@ -12,6 +12,15 @@ Documentação técnica detalhada do agente de inteligência artificial que proc
 | Schema de extração | `backend/app/schemas/__init__.py` |
 | Memória de conversa | `backend/app/models/conversa.py` |
 
+### Visual do fluxo
+
+| Formato | Arquivo | Uso |
+| ------- | ------- | --- |
+| **Interativo (Cursor Canvas)** | [gastozap-agente-fluxo.canvas.tsx](file:///C:/Users/Brunno/.cursor/projects/d-Works-Cyrela-Contrutora-portfolio-repo/canvases/gastozap-agente-fluxo.canvas.tsx) | Abra ao lado do chat no Cursor — 4 abas: pipeline, novo gasto, intenções e estados |
+| **SVG estático (fluxo)** | [`Fluxo_Agente.svg`](./Fluxo_Agente.svg) | Visualização em navegador, VS Code ou GitHub |
+| **SVG estático (tabelas)** | [`Modelo_Dados.svg`](./Modelo_Dados.svg) | Diagrama ER + colunas principais |
+| **Canvas interativo (tabelas)** | [gastozap-modelo-dados.canvas.tsx](file:///C:/Users/Brunno/.cursor/projects/d-Works-Cyrela-Contrutora-portfolio-repo/canvases/gastozap-modelo-dados.canvas.tsx) | Diagrama ER, colunas e relacionamentos |
+
 ---
 
 ## 1. Visão Geral

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 920" font-family="Segoe UI, system-ui, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#4a5568"/>
+    </marker>
+    <style>
+      .title { font-size: 22px; font-weight: 600; fill: #1a1a1a; }
+      .subtitle { font-size: 13px; fill: #555; }
+      .section { font-size: 12px; font-weight: 600; fill: #2c5282; }
+      .tbl-h { font-size: 12px; font-weight: 700; fill: #fff; }
+      .tbl-c { font-size: 10px; fill: #1a202c; }
+      .tbl-pk { font-size: 10px; fill: #2b6cb0; font-weight: 600; }
+      .tbl-fk { font-size: 10px; fill: #c05621; }
+      .legend { font-size: 11px; fill: #4a5568; }
+      .rel { stroke: #718096; stroke-width: 1.2; fill: none; }
+    </style>
+  </defs>
+
+  <text x="550" y="32" class="title" text-anchor="middle">GastoZap - Modelo de Dados (PostgreSQL)</text>
+  <text x="550" y="52" class="subtitle" text-anchor="middle">9 tabelas | backend/app/models/</text>
+
+  <!-- LEGEND -->
+  <rect x="40" y="68" width="1020" height="44" rx="6" fill="#f7fafc" stroke="#cbd5e0"/>
+  <rect x="56" y="82" width="14" height="14" fill="#2b6cb0"/>
+  <text x="78" y="93" class="legend">Nucleo (lancamentos)</text>
+  <rect x="200" y="82" width="14" height="14" fill="#38a169"/>
+  <text x="222" y="93" class="legend">Cadastros auxiliares</text>
+  <rect x="380" y="82" width="14" height="14" fill="#dd6b20"/>
+  <text x="402" y="93" class="legend">Agente / conversa</text>
+  <rect x="560" y="82" width="14" height="14" fill="#805ad5"/>
+  <text x="582" y="93" class="legend">Fase futura (faturas)</text>
+  <line x1="720" y1="89" x2="760" y2="89" class="rel" marker-end="url(#arrow)"/>
+  <text x="772" y="93" class="legend">Foreign key (1:N)</text>
+
+  <!-- SETORES -->
+  <rect x="40" y="130" width="200" height="22" rx="4" fill="#38a169"/>
+  <text x="140" y="145" class="tbl-h" text-anchor="middle">setores</text>
+  <rect x="40" y="152" width="200" height="58" fill="#f0fff4" stroke="#9ae6b4"/>
+  <text x="52" y="168" class="tbl-pk">id (PK)</text>
+  <text x="52" y="184" class="tbl-c">nome (unique)</text>
+  <text x="52" y="200" class="tbl-c">ex: mercado, gasolina</text>
+
+  <!-- ESTABELECIMENTOS -->
+  <rect x="40" y="240" width="220" height="22" rx="4" fill="#38a169"/>
+  <text x="150" y="255" class="tbl-h" text-anchor="middle">estabelecimentos</text>
+  <rect x="40" y="262" width="220" height="100" fill="#f0fff4" stroke="#9ae6b4"/>
+  <text x="52" y="278" class="tbl-pk">id (PK)</text>
+  <text x="52" y="294" class="tbl-c">nome_exibicao</text>
+  <text x="52" y="310" class="tbl-c">nome_fatura</text>
+  <text x="52" y="326" class="tbl-fk">setor_id (FK)</text>
+  <text x="52" y="342" class="tbl-c">obs (nome personalizado)</text>
+
+  <!-- LANCAMENTOS (center) -->
+  <rect x="400" y="200" width="300" height="22" rx="4" fill="#2b6cb0"/>
+  <text x="550" y="215" class="tbl-h" text-anchor="middle">lancamentos</text>
+  <rect x="400" y="222" width="300" height="196" fill="#ebf8ff" stroke="#90cdf4"/>
+  <text x="412" y="238" class="tbl-pk">id (PK)</text>
+  <text x="412" y="254" class="tbl-fk">estabelecimento_id (FK)</text>
+  <text x="412" y="270" class="tbl-fk">setor_id (FK)</text>
+  <text x="412" y="286" class="tbl-fk">cartao_id (FK)</text>
+  <text x="412" y="302" class="tbl-fk">fatura_id (FK, null)</text>
+  <text x="412" y="318" class="tbl-c">tipo, valor, parcelas</text>
+  <text x="412" y="334" class="tbl-c">data_hora, origem</text>
+  <text x="412" y="350" class="tbl-c">message_id, key_id</text>
+  <text x="412" y="366" class="tbl-c">created_at, updated_at</text>
+  <text x="412" y="400" class="section">Tabela principal de gastos</text>
+
+  <!-- CARTOES -->
+  <rect x="780" y="130" width="280" height="22" rx="4" fill="#38a169"/>
+  <text x="920" y="145" class="tbl-h" text-anchor="middle">cartoes</text>
+  <rect x="780" y="152" width="280" height="148" fill="#f0fff4" stroke="#9ae6b4"/>
+  <text x="792" y="168" class="tbl-pk">id (PK)</text>
+  <text x="792" y="184" class="tbl-c">banco_origem, ultimos_4_digitos</text>
+  <text x="792" y="200" class="tbl-c">vencimento, bandeira</text>
+  <text x="792" y="216" class="tbl-c">limite_total / em_uso / restante</text>
+  <text x="792" y="232" class="tbl-c">qt_assinaturas</text>
+  <text x="792" y="248" class="tbl-c">valores_futuros (JSONB)</text>
+  <text x="792" y="264" class="tbl-c">cartao_padrao (sim/nao)</text>
+  <text x="792" y="280" class="tbl-c">obs</text>
+
+  <!-- FATURAS -->
+  <rect x="780" y="330" width="280" height="22" rx="4" fill="#805ad5"/>
+  <text x="920" y="345" class="tbl-h" text-anchor="middle">faturas_importadas</text>
+  <rect x="780" y="352" width="280" height="88" fill="#faf5ff" stroke="#d6bcfa"/>
+  <text x="792" y="368" class="tbl-pk">id (PK)</text>
+  <text x="792" y="384" class="tbl-fk">cartao_id (FK)</text>
+  <text x="792" y="400" class="tbl-c">arquivo_referencia</text>
+  <text x="792" y="416" class="tbl-c">periodo_referencia</text>
+  <text x="792" y="432" class="tbl-c">created_at</text>
+
+  <!-- RELATIONSHIPS -->
+  <path d="M240 181 L320 181 L320 254 L400 254" class="rel" marker-end="url(#arrow)"/>
+  <path d="M150 262 L150 380 L400 380" class="rel" marker-end="url(#arrow)"/>
+  <path d="M260 312 L360 312" class="rel" marker-end="url(#arrow)"/>
+  <path d="M700 286 L780 286" class="rel" marker-end="url(#arrow)"/>
+  <path d="M920 300 L920 330" class="rel" marker-end="url(#arrow)"/>
+  <path d="M780 396 L700 396" class="rel" marker-end="url(#arrow)"/>
+
+  <!-- AGENT TABLES -->
+  <text x="40" y="470" class="section">Tabelas do agente (sem FK para lancamentos)</text>
+
+  <!-- HISTORICO -->
+  <rect x="40" y="486" width="320" height="22" rx="4" fill="#dd6b20"/>
+  <text x="200" y="501" class="tbl-h" text-anchor="middle">historico_mensagens</text>
+  <rect x="40" y="508" width="320" height="116" fill="#fffaf0" stroke="#fbd38d"/>
+  <text x="52" y="524" class="tbl-pk">id (PK)</text>
+  <text x="52" y="540" class="tbl-c">message_id, key_id</text>
+  <text x="52" y="556" class="tbl-c">tipo_mensagem, phone_number</text>
+  <text x="52" y="572" class="tbl-c">conteudo_original / processado</text>
+  <text x="52" y="588" class="tbl-c">status (processando, pendente...)</text>
+  <text x="52" y="604" class="tbl-c">created_at</text>
+
+  <!-- CONVERSA -->
+  <rect x="390" y="486" width="320" height="22" rx="4" fill="#dd6b20"/>
+  <text x="550" y="501" class="tbl-h" text-anchor="middle">conversa_contexto</text>
+  <rect x="390" y="508" width="320" height="100" fill="#fffaf0" stroke="#fbd38d"/>
+  <text x="402" y="524" class="tbl-pk">id (PK)</text>
+  <text x="402" y="540" class="tbl-c">phone_number (unique)</text>
+  <text x="402" y="556" class="tbl-c">mensagens (JSONB)</text>
+  <text x="402" y="572" class="tbl-c">estado, dados_estado (JSONB)</text>
+  <text x="402" y="588" class="tbl-c">updated_at</text>
+
+  <!-- PENDENTES -->
+  <rect x="740" y="486" width="320" height="22" rx="4" fill="#dd6b20"/>
+  <text x="900" y="501" class="tbl-h" text-anchor="middle">transacoes_pendentes</text>
+  <rect x="740" y="508" width="320" height="132" fill="#fffaf0" stroke="#fbd38d"/>
+  <text x="752" y="524" class="tbl-pk">id (PK)</text>
+  <text x="752" y="540" class="tbl-c">phone_number, historico_id</text>
+  <text x="752" y="556" class="tbl-c">campos_capturados (JSONB)</text>
+  <text x="752" y="572" class="tbl-c">campos_faltantes (JSONB)</text>
+  <text x="752" y="588" class="tbl-c">status, origem, tentativas_imagem</text>
+  <text x="752" y="604" class="tbl-c">message_id, key_id</text>
+  <text x="752" y="620" class="tbl-c">created_at, updated_at</text>
+
+  <!-- FLOW SUMMARY -->
+  <rect x="40" y="660" width="1020" height="220" rx="8" fill="#f7fafc" stroke="#e2e8f0"/>
+  <text x="60" y="686" class="section">Fluxo de dados resumido</text>
+  <text x="60" y="712" class="tbl-c">1. WhatsApp chega -&gt; historico_mensagens (auditoria)</text>
+  <text x="60" y="732" class="tbl-c">2. Agente le/grava conversa_contexto (memoria + estado)</text>
+  <text x="60" y="752" class="tbl-c">3. Extracao parcial -&gt; transacoes_pendentes (ate completar campos)</text>
+  <text x="60" y="772" class="tbl-c">4. Gasto confirmado -&gt; resolve estabelecimentos + setores + cartoes</text>
+  <text x="60" y="792" class="tbl-c">5. INSERT em lancamentos (vincula FKs) -&gt; dashboard le via API</text>
+  <text x="60" y="812" class="tbl-c">6. Projecao atualiza cartoes.valores_futuros (parcelas / assinaturas)</text>
+  <text x="60" y="848" class="tbl-c">Cardinalidade: 1 setor -&gt; N lancamentos | 1 estabelecimento -&gt; N lancamentos | 1 cartao -&gt; N lancamentos</text>
+  <text x="60" y="868" class="tbl-c">1 cartao -&gt; N faturas_importadas | 1 fatura -&gt; N lancamentos (opcional, fase futura)</text>
+
+  <text x="550" y="905" class="subtitle" text-anchor="middle">Fonte: backend/app/models/ | admin_files/Documentacao_Agente.md</text>
+</svg>

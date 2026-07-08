@@ -10,6 +10,7 @@ class ExtracaoLancamento(BaseModel):
         "novo_gasto", "correcao", "consulta", "resumo_mes", "cadastro_cartao", "confirmacao", "outro"
     ] = "novo_gasto"
     estabelecimento: str | None = None
+    item: str | None = None
     setor: str | None = None
     tipo: Literal["a_vista", "assinatura", "fixo", "parcelado"] | None = None
     valor: Decimal | None = None
@@ -22,6 +23,7 @@ class ExtracaoLancamento(BaseModel):
     acao_correcao: Literal["apagar", "editar"] | None = None
     campos_correcao: dict[str, Any] | None = None
     lancamento_alvo: Literal["ultimo", "especifico"] | None = None
+    tipo_consulta: Literal["limite", "setor", "total_mes"] | None = None
 
 
 class CartaoCreate(BaseModel):
@@ -30,12 +32,40 @@ class CartaoCreate(BaseModel):
     vencimento: str | None = None
     bandeira: str | None = None
     limite_total: Decimal | None = None
-    cartao_padrao: str = "sim"
+    cartao_padrao: str = "nao"
     obs: str | None = None
+
+
+class CartaoUpdate(BaseModel):
+    banco_origem: str | None = None
+    ultimos_4_digitos: str | None = None
+    vencimento: str | None = None
+    bandeira: str | None = None
+    limite_total: Decimal | None = None
+    cartao_padrao: str | None = None
+    obs: str | None = None
+
+
+class CartaoResponse(BaseModel):
+    id: int
+    banco_origem: str
+    ultimos_4_digitos: str
+    vencimento: str | None = None
+    bandeira: str | None = None
+    limite_total: float | None = None
+    limite_em_uso: float | None = None
+    limite_restante: float | None = None
+    qt_assinaturas: int = 0
+    valores_futuros: dict[str, float] = Field(default_factory=dict)
+    cartao_padrao: str
+    obs: str | None = None
+
+    model_config = {"from_attributes": True}
 
 
 class LancamentoResponse(BaseModel):
     id: int
+    item: str | None = None
     estabelecimento: str
     setor: str
     tipo: str
@@ -50,6 +80,7 @@ class LancamentoResponse(BaseModel):
 
 class LancamentoListItem(BaseModel):
     id: int
+    item: str | None = None
     estabelecimento: str
     setor: str
     tipo: str
